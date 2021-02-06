@@ -12,6 +12,7 @@ CDEFS =
 CFLAGS = -Werror -Wall -g -O2
 CFLAGS += -DGIT_VERSION="\"$(shell git describe --long --tags --dirty --always)\""
 CFLAGS += -DGIT_DATE="\"$(shell git show -s --format=%ci|cut -d" " -f1)\""
+CFLAGS += -Wno-error=unused-result
 LDFLAGS = -g
 
 #
