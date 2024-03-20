@@ -9,6 +9,7 @@
 #include "defs.h"
 #include "code.h"
 #include "const.h"
+#include "c_data_bank.h"
 #include "error.h"
 #include "io.h"
 #include "lex.h"
@@ -1067,6 +1068,9 @@ void do_inc_ex (intptr_t type)
 	add_buffer(str, '(', 1);
 	const_data[const_data_idx++] = '\0';
 	const_val[const_val_idx++] = -(litptr + 1024);	/* pal idx table addr */
+#if defined(DBPRN)
+	fprintf(stdout, "add_const:CINT\n");
+#endif
 	add_const(CINT);
 
 	/* create pal idx table */

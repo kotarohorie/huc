@@ -23,6 +23,7 @@
 #include "data.h"
 #include "code.h"
 #include "const.h"
+#include "c_data_bank.h"
 #include "enum.h"
 #include "error.h"
 #include "function.h"
@@ -294,6 +295,7 @@ unknown_option:
 			lastst =
 			quote[1] =
 			const_nb =
+			c_data_bank_nb =
 			line_number = 0;
 			macptr = smacptr;
 			input2 = NULL;
@@ -421,7 +423,7 @@ void usage (char *exename)
 	fprintf(stderr, "-Asym[=val]       define symbol 'sym' to assembler\n");
 	fprintf(stderr, "\nDebugging options:\n");
 	fprintf(stderr, "-t/-T             include C source code in assembler output/listings\n");
-	fprintf(stderr, "-v/-V             increase verbosity of output files (max. 2)\n\n");
+	fprintf(stderr, "-v/-V             increase verbosity of output files (max. 3)\n\n");
 	exit(1);
 }
 
@@ -462,6 +464,10 @@ void parse (void)
 		if (amatch("extern", 6))
 			dodcls(EXTERN, NULL_TAG, 0);
 		else if (amatch("static", 6)) {
+			/**
+			 * @remarks
+			 * static C_DATA_BANK は使用しないと思うので未対応
+			 */
 			if (amatch("const", 5)) {
 				/* XXX: what about the static part? */
 				dodcls(CONST, NULL_TAG, 0);
@@ -471,6 +477,8 @@ void parse (void)
 		}
 		else if (amatch("const", 5))
 			dodcls(CONST, NULL_TAG, 0);
+		else if (amatch("C_DATA_BANK", 11))
+			dodcls(CDB, NULL_TAG, 0);
 		else if (amatch("typedef", 7))
 			dotypedef();
 		else if (dodcls(PUBLIC, NULL_TAG, 0)) ;
@@ -562,8 +570,13 @@ void dumplits (void)
 {
 	intptr_t j, k;
 
+	dump_c_data_bank();
+
 	if ((litptr == 0) && (const_nb == 0))
 		return;
+#if defined(DBPRN)
+	printf("litptr=$%04X,const_nb=%d\n", litptr, const_nb);
+#endif
 
 	outstr("\t.data\n");
 	outstr("\t.bank CONST_BANK\n");
@@ -939,6 +952,8 @@ static void dumpfinal (void)
 	fseek(output, output_globdef, SEEK_SET);
 	if (have_irq_handler || have_sirq_handler)
 		outstr("HAVE_IRQ = 1\n");
+	if (have_p6code_handler)
+		outstr("HAVE_P6CODE = 1\n");
 	if (have_sirq_handler)
 		outstr("HAVE_SIRQ = 1\n");
 	if (have_init_data)
@@ -1020,7 +1035,9 @@ intptr_t assemble (char *s)
 		strcat_s(buf, sizeof(buf), "-over ");
 
 	if (verboseflag) {
-		if (verboseflag > 1)
+		if (verboseflag > 2)
+			strcat_s(buf, sizeof(buf), "-S -l 3 -m -dbprn ");
+		else if (verboseflag > 1)
 			strcat_s(buf, sizeof(buf), "-S -l 3 -m ");
 		else
 			strcat_s(buf, sizeof(buf), "-S -l 0 ");
@@ -1071,6 +1088,9 @@ intptr_t assemble (char *s)
 
 	if (verboseflag) {
 		opts[i++] = "-S";		/* asm: display full segment map */
+		if (verboseflag > 2) {
+			opts[i++] = "-dbprn";	/* asm: debug print enable */
+		}
 		if (verboseflag > 1) {
 			opts[i++] = "-l 3";	/* top listing output */
 			opts[i++] = "-m";	/* force macros also */

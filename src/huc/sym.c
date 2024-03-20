@@ -11,6 +11,7 @@
 #include "data.h"
 #include "code.h"
 #include "const.h"
+#include "c_data_bank.h"
 #include "error.h"
 #include "gen.h"
 #include "initials.h"
@@ -190,7 +191,19 @@ intptr_t declglb (intptr_t typ, intptr_t stor, TAG_SYMBOL *mtag, int otag, int i
 				multidef(sname);
 			if (match("[")) {
 				if (stor == CONST)
+				{
+					#if defined(DBPRN)
+					fprintf(stdout, "array_initializer:typ=0x%X,id=0x%X,stor=0x%X,sname=%s\n", typ, id, stor, sname);
+					#endif
 					k = array_initializer(typ, id, stor);
+				}
+				else if (stor == CDB)
+				{
+					#if defined(DBPRN)
+					fprintf(stdout, "array_initializer_cdb:typ=0x%X,id=0x%X,stor=0x%X,sname=%s\n", typ, id, stor, sname);
+					#endif
+					k = array_initializer_cdb(typ, id, stor);
+				}
 				else
 					k = needsub();
 				if (k == -1)
@@ -207,6 +220,10 @@ intptr_t declglb (intptr_t typ, intptr_t stor, TAG_SYMBOL *mtag, int otag, int i
 						error("empty const array");
 						id = ARRAY;
 					}
+					else if (stor == CDB) {
+						error("empty C_DATA_BANK array");
+						id = ARRAY;
+					}
 					else if (id == POINTER)
 						id = ARRAY;
 					else {
@@ -217,8 +234,18 @@ intptr_t declglb (intptr_t typ, intptr_t stor, TAG_SYMBOL *mtag, int otag, int i
 			}
 			else {
 				if (stor == CONST) {
+					#if defined(DBPRN)
+					fprintf(stdout, "scalar_initializer:typ=0x%X,id=0x%X,stor=0x%X,sname=%s\n", typ, id, stor, sname);
+					#endif
 					/* stor  = PUBLIC; XXX: What is this for? */
 					scalar_initializer(typ, id, stor);
+				}
+				if (stor == CDB) {
+					#if defined(DBPRN)
+					fprintf(stdout, "scalar_initializer_cdb:typ=0x%X,id=0x%X,stor=0x%X,sname=%s\n", typ, id, stor, sname);
+					#endif
+					/* stor  = PUBLIC; XXX: What is this for? */
+					scalar_initializer_cdb(typ, id, stor);
 				}
 			}
 			if (mtag == 0) {
@@ -230,21 +257,44 @@ intptr_t declglb (intptr_t typ, intptr_t stor, TAG_SYMBOL *mtag, int otag, int i
 					else if (id == ARRAY)
 						k *= tag_table[otag].size;
 				}
-				if (stor != CONST) {
-					id = initials(sname, typ, id, k, otag);
-					SYMBOL *c = addglb(sname, id, typ, k, stor, s);
-					if (typ == CSTRUCT)
-						c->tagidx = otag;
-					c->ptr_order = ptr_order;
-				}
-				else {
-					SYMBOL *c = addglb(sname, id, typ, k, CONST, s);
-					if (c) {
-						add_const(typ);
+				switch (stor) {
+				default:
+					{
+						id = initials(sname, typ, id, k, otag);
+						SYMBOL *c = addglb(sname, id, typ, k, stor, s);
 						if (typ == CSTRUCT)
 							c->tagidx = otag;
+						c->ptr_order = ptr_order;
+						break;
 					}
-					c->ptr_order = ptr_order;
+				case CONST:
+					{
+						SYMBOL *c = addglb(sname, id, typ, k, CONST, s);
+						if (c) {
+							#if defined(DBPRN)
+							fprintf(stdout, "add_const:typ=0x%X\n", typ);
+							#endif
+							add_const(typ);
+							if (typ == CSTRUCT)
+								c->tagidx = otag;
+						}
+						c->ptr_order = ptr_order;
+						break;
+					}
+				case CDB:
+					{
+						SYMBOL *c = addglb(sname, id, typ, k, CDB, s);
+						if (c) {
+							#if defined(DBPRN)
+							fprintf(stdout, "add_c_data_bank:typ=0x%X\n", typ);
+							#endif
+							add_c_data_bank(typ);
+							if (typ == CSTRUCT)
+								c->tagidx = otag;
+						}
+						c->ptr_order = ptr_order;
+						break;
+					}
 				}
 			}
 			else if (is_struct) {
@@ -268,7 +318,11 @@ intptr_t declglb (intptr_t typ, intptr_t stor, TAG_SYMBOL *mtag, int otag, int i
 			return (0);
 
 		if (!match(",")) {
+			#if defined(DBPRN)
+			error("syntax error #13");
+			#else
 			error("syntax error");
+			#endif
 			return (1);
 		}
 	}

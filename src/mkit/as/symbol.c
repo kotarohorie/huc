@@ -138,6 +138,7 @@ stlook(int flag)
 	else {
 		/* search symbol */
 		hash = symhash();
+		//printf("symbol(%s),hash(%d)\n", symbol, hash);
 		sym = hash_tbl[hash];
 		while (sym) {
 			if (!strcmp(symbol, sym->name))
@@ -278,7 +279,7 @@ labldef(int lval, int flag)
 	else {
 		if ((lablptr->value != lval) ||
 		    ((flag) && (bank < bank_limit) && (lablptr->bank != bank_base + bank))) {
-			fatal_error("Internal error[1]!");
+			fatal_error("Internal error[1]! (.procbank bank overflow?)");
 			return (-1);
 		}
 	}

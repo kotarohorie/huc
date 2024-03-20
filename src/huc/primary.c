@@ -46,6 +46,8 @@ int match_type (struct type *t, int do_ptr, int allow_unk_compound)
 		t->flags |= F_VOLATILE;
 	if (amatch("const", 5))
 		t->flags |= F_CONST;
+	if (amatch("C_DATA_BANK", 11))
+		t->flags |= F_CDB;
 
 	if ((sflag = amatch("struct", 6)) || amatch("union", 5)) {
 		/* compound */

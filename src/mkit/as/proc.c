@@ -111,6 +111,12 @@ do_call(int *ip)
 		/* opcode */
 		putbyte(data_loccnt, 0x20);
 		putword(data_loccnt+1, value);
+		//printf("%s:/bank:%02X/offset:%04X/data:%04X\n", symbol, bank, data_loccnt+1, value);
+		/*
+			_x_joydata_update:/bank:5E/offset:1A1D/data:A12F
+				main()関数の以下の出力
+				6376  5E:BA1C  20 2F A1  	  call	_x_joydata_update		
+		*/
 
 		/* output line */
 		println();
@@ -205,10 +211,15 @@ do_proc(int *ip)
 	proc_nb++;
 
 	/* set new bank infos */
+	int bak_bank = bank;
 	bank     = proc_ptr->bank;
 	page     = 5;
 	loccnt   = proc_ptr->org;
 	glablptr = lablptr;
+	if (dbprn_opt && bak_bank != bank)
+	{
+		printf("do_proc:%-32s:bank:%02X->%02X/section:%d/loccnt:%04X\n", &lablptr->name[1], bak_bank, bank, section, loccnt);
+	}
 
 	/* define label */
 	labldef(loccnt, 1);
@@ -244,7 +255,14 @@ do_endp(int *ip)
 		return;
 
 	/* record proc size */
+	int bak_bank = bank;
 	bank = proc_ptr->old_bank;
+	/* .endp で一旦 bank は 0 に戻るみたい。
+	if (bak_bank != bank)
+	{
+		printf("do_endp:bank:%02X->%02X\n", bak_bank, bank);
+	}
+	*/
 	proc_ptr->size = loccnt - proc_ptr->base;
 	proc_ptr = proc_ptr->group;
 
@@ -279,17 +297,42 @@ proc_reloc(void)
 	int minbanks = 0;
 	int totalsize = 0;
 	struct t_proc *list = proc_first;
+	int proc_bank_base = 0;
 
 	if (proc_nb == 0)
 		return;
 
 	/* init */
 	proc_ptr = proc_first;
+	int bak_bank = bank;
 	bank = max_bank + 1;
+	/**
+	 * .procbank で指定した分、バンクを確保する。
+	 * DATA と CODE の間のバンクに .procbank で括った関数を格納する。
+	 * - .procbank が未使用の時
+	 *   proc_bank_base = bank_base
+	 * - .procbank が使用の時 ex) .procbank 0 
+	 *   bank_base = proc_bank_base + 1
+	 * - .procbank が使用の時 ex) .procbank 1
+	 *   bank_base = proc_bank_base + 2
+	 */
+	proc_bank_base = bank;
+	if (max_proc_bank >= 0)
+	{
+		bank += (max_proc_bank +1);
+	}
+	if (dbprn_opt && bak_bank != bank)
+	{
+		printf("proc_reloc(1):bank:%02X->%02X\n", bak_bank, bank);
+	}
 	bank_base = bank;
 
 	while(list)
 	{
+		if (dbprn_opt)
+		{
+			printf("proc_reloc:%-32s:size:%04X/bank:%02X\n", list->name, list->size, list->bank);
+		}
 		totalsize += list->size;
 		list = list->link;
 	}
@@ -314,25 +357,48 @@ proc_reloc(void)
 
 	for(i = 0; i < bank_limit; i++)
 	{
-		if(i >= bank_base)
+		if (i >= proc_bank_base)
 			bankleft[i] = 0x2000;
 		else
 			bankleft[i] = 0;
+	}
+
+	if (dbprn_opt)
+	{
+		printf("bankleft(new)");
+		for(i = 0; i < bank_limit; i++)
+		{
+			if ((i % 16) == 0)
+			{
+				printf("\n");
+				printf("bank%02X~:", i);
+			}
+			printf(" %04X", bankleft[i]);
+		}
+		printf("\n");
 	}
 
 	proc_ptr = proc_first;
 
 	/* alloc memory */
 	while (proc_ptr) {
+		/* procbank */
+		if (proc_ptr->proc_bank >= 0)
+		{
+			int proposedbank = proc_bank_base + proc_ptr->proc_bank;
+			proc_ptr->bank = proposedbank;
+			proc_ptr->org = 0x2000 - bankleft[proposedbank];
+			bankleft[proposedbank] -= proc_ptr->size;
+		}
 		/* proc */
-		if (proc_ptr->group == NULL) {
+		else if (proc_ptr->group == NULL) {
 			int check = 0;
 			int unusedspace = 0x2000;
 			int proposedbank = -1;
 
 			while(proposedbank == -1)
 			{
-				for(check = 0; check < minbanks; check++)
+				for(check = bank_base; check < minbanks; check++)
 				{
 					if(bankleft[check] > proc_ptr->size)
 					{
@@ -348,6 +414,11 @@ proc_reloc(void)
 				{
 					/* bank change */
 					minbanks++;
+					/**
+					 * @remarks
+					 * - ROMが足りなくなった時のエラー処理
+					 * - よって、現状、この if は必ず偽
+					 */
 					if (minbanks > bank_limit)
 					{
 						int total = 0, totfree = 0;
@@ -402,10 +473,30 @@ proc_reloc(void)
 		}
 
 		/* next */
+		int bak_bank = bank;
 		bank = minbanks-1;
+		if (dbprn_opt && bak_bank != bank)
+		{
+			printf("proc_reloc(2):bank:%02X->%02X\n", bak_bank, bank);
+		}
 		max_bank = bank;
 		proc_ptr->refcnt = 0;
 		proc_ptr = proc_ptr->link;
+	}
+
+	if (dbprn_opt)
+	{
+		printf("bankleft(after)");
+		for(i = 0; i < bank_limit; i++)
+		{
+			if ((i % 16) == 0)
+			{
+				printf("\n");
+				printf("bank%02X~:", i);
+			}
+			printf(" %04X", bankleft[i]);
+		}
+		printf("\n");
 	}
 
 	free(bankleft);
@@ -504,7 +595,13 @@ proc_install(void)
 	/* initialize it */
 	strcpy(ptr->name, &symbol[1]);
 	hash = symhash();
+	//printf("symbol(%s),hash(%d)\n", symbol, hash);
 	ptr->bank = (optype == P_PGROUP)  ? GROUP_BANK : PROC_BANK;
+	// .procbank ~ .endprocbank の間の proc は、 PROCBANK_BANK とする。
+	if (proc_bank >= 0)
+	{
+		ptr->bank = PROCBANK_BANK;
+	}
 	ptr->base = proc_ptr ? loccnt : 0;
 	ptr->org = ptr->base;
 	ptr->size = 0;
@@ -514,8 +611,10 @@ proc_install(void)
 	ptr->next = proc_tbl[hash];
 	ptr->group = proc_ptr;
 	ptr->type = optype;
+	ptr->proc_bank = proc_bank;
 	proc_ptr = ptr;
 	proc_tbl[hash] = proc_ptr;
+	//printf("%s:/bank:%02X/base:%04X\n", symbol, ptr->bank, ptr->base);
 
 	/* link it */
 	if (proc_first == NULL) {
@@ -596,4 +695,63 @@ proc_sortlist(void)
 	}
 	proc_first = sorted_list;
 	return;
+}
+
+/***
+ * @remarks
+ * - do_bank() から必要そうな処理をコピペして作成
+ */
+void do_procbank(int *ip)
+{
+	/* not allowed in procs */
+	if (proc_ptr) {
+		fatal_error("Bank can not be changed in procs!");
+		return;
+	}
+
+	/* define label */
+	labldef(loccnt, 1);
+
+	/* get bank index */
+	if (!evaluate(ip, 0))
+		return;
+	if (value > proc_bank_limit) {
+		error("Proc Bank index out of range!");
+		return;
+	}
+
+	/* check if there's a bank name */
+	switch (prlnbuf[*ip]) {
+	case ';':
+	case '\0':
+		break;
+
+	case ',':
+		break;
+
+	default:
+		error("Syntax error!");
+		return;
+	}
+
+	/* get new bank infos */
+	proc_bank = value;
+	if (dbprn_opt)
+	{
+		printf("do_procbank:proc_bank=%02X\n", proc_bank);
+	}
+
+	/* update the max bank counter */
+	if (max_proc_bank < proc_bank)
+		max_proc_bank = proc_bank;
+
+	/* output on last pass */
+	if (pass == LAST_PASS) {
+		loadlc(bank, 1);
+		println();
+	}
+}
+void do_endprocbank(int *ip)
+{
+	proc_bank = -1;
 }

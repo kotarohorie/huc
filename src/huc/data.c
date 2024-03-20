@@ -20,6 +20,19 @@ intptr_t const_data_idx;
 intptr_t const_size;
 intptr_t const_nb;
 
+/* c_data_bank arrays storage */
+
+struct const_array *c_data_bank_ptr;
+struct const_array c_data_bank_var[MAX_C_DATA_BANK];
+intptr_t c_data_bank_val[MAX_C_DATA_BANK_VALUE];
+char c_data_bank_data[MAX_C_DATA_BANK_DATA];
+intptr_t c_data_bank_val_start;
+intptr_t c_data_bank_val_idx;
+intptr_t c_data_bank_data_start;
+intptr_t c_data_bank_data_idx;
+intptr_t c_data_bank_size;
+intptr_t c_data_bank_nb;
+
 /* storage words */
 
 SYMBOL symtab[SYMTBSZ];
@@ -110,6 +123,7 @@ int user_signed_char = 0;
 intptr_t output_globdef;
 int have_irq_handler;
 int have_sirq_handler;
+int have_p6code_handler;
 
 int need_map_call_bank;
 

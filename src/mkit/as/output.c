@@ -167,6 +167,7 @@ putbyte(int offset, int data)
 
 	rom[bank][offset] = (data) & 0xFF;
 	map[bank][offset] = section + (page << 5);
+	//printf("%s:/bank:%02X/offset:%04X/data:%02X\n", symbol, bank, offset, data & 0xFF);
 
 	/* update rom size */
 	if (((addr - 1) >> 13) > max_bank)
@@ -194,6 +195,12 @@ putword(int offset, int data)
 		return;
 	}
 
+	//printf("%s:/bank:%02X/offset:%04X/data:%04X\n", symbol, bank, offset, data);
+	/*
+		_x_joydata_update:/bank:5E/offset:1A1D/data:A12F
+			main()関数の以下の出力
+			6376  5E:BA1C  20 2F A1  	  call	_x_joydata_update		
+	*/
 	/* low byte */
 	rom[bank][offset] = (data) & 0xFF;
 	map[bank][offset] = section + (page << 5);

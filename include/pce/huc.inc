@@ -171,10 +171,19 @@ __ldw	.macro
 .endm
 
 __ldwp	.macro
+	;(22/6/29) %2 に Y レジスタの値を指定する事ができるように拡張
+.if (\# = 2)
+	ldy \2
+	lda	[\1],Y
+	tax
+	iny
+	lda	[\1],Y
+.else
 	lda	[\1]
 	tax
 	ldy	#1
 	lda	[\1],Y
+.endif
 .endm
 
 __ldwi	.macro
@@ -206,11 +215,21 @@ __stwz	.macro
 .endm
 
 __stwp	.macro
+	;(22/6/29) %2 に Y レジスタの値を指定する事ができるように拡張
+.if (\# = 2)
+	ldy	\2
+	sax
+	sta	[\1],Y
+	sax
+	iny
+	sta	[\1],Y
+.else
 	sax
 	sta	[\1]
 	sax
 	ldy	#1
 	sta	[\1],Y
+.endif
 .endm
 
 __stbp	.macro

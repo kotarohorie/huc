@@ -251,7 +251,11 @@ void new_fastcall (void)
 		if (!symget(sname)) {
 			if (*cmdptr == ')')
 				break;
+			#if defined(DBPRN)
+			error("syntax error #9");
+			#else
 			error("syntax error");
+			#endif
 			return;
 		}
 		if (strcmp(sname, "byte") == 0)
@@ -288,7 +292,11 @@ void new_fastcall (void)
 
 				/* low word */
 				if (*cmdptr++ != ':') {
+					#if defined(DBPRN)
+					error("syntax error #10");
+					#else
 					error("syntax error");
+					#endif
 					return;
 				}
 				if (!symget(sname)) {
@@ -301,7 +309,11 @@ void new_fastcall (void)
 
 				/* high word */
 				if (*cmdptr++ != '|') {
+					#if defined(DBPRN)
+					error("syntax error #11");
+					#else
 					error("syntax error");
+					#endif
 					return;
 				}
 				if (!symget(sname)) {
@@ -322,7 +334,11 @@ void new_fastcall (void)
 
 				/* addr */
 				if (*cmdptr++ != ':') {
+					#if defined(DBPRN)
+					error("syntax error #12");
+					#else
 					error("syntax error");
+					#endif
 					return;
 				}
 				if (!symget(sname)) {

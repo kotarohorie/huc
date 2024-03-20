@@ -187,9 +187,14 @@
 /* symbol table entry format */
 /* N.B. nasty hack to allow space beyond NAMEMAX (see "copysym") */
 
-#define NAMESIZE	26
-#define NAMEMAX		25
-#define NAMEALLOC	40
+/**
+ * @remarks
+ * - 関数名の長さを10文字増やした。
+ * - 3つの #define の詳細は調べていないが全て +10 した。
+ */
+#define NAMESIZE	(26+10)
+#define NAMEMAX		(25+10)
+#define NAMEALLOC	(40+10)
 
 struct symbol {
 	char name[NAMEALLOC];
@@ -205,7 +210,8 @@ struct symbol {
 
 typedef struct symbol SYMBOL;
 
-#define NUMTAG  10
+//#define NUMTAG  10
+#define NUMTAG  100
 
 struct tag_symbol {
 	char name[NAMESIZE];	// structure tag name
@@ -218,7 +224,7 @@ struct tag_symbol {
 #define NULL_TAG 0
 
 // Define the structure member table parameters
-#define NUMMEMB         128
+#define NUMMEMB         512
 
 /* possible entries for "ident" */
 
@@ -249,6 +255,7 @@ struct tag_symbol {
 #define LSTATIC 5
 #define DEFAUTO 6
 #define CONST   7
+#define CDB		8
 
 #define WRITTEN 128
 
@@ -349,6 +356,10 @@ typedef struct {
 #define MAX_CONST_VALUE  8192
 #define MAX_CONST_DATA  65536
 
+#define MAX_C_DATA_BANK        1024
+#define MAX_C_DATA_BANK_VALUE 16384
+#define MAX_C_DATA_BANK_DATA  65536
+
 struct const_array {
 	SYMBOL *sym;
 	intptr_t typ;
@@ -410,6 +421,7 @@ struct type {
 #define F_CONST 2
 #define F_VOLATILE 4
 #define F_STRUCT 8	/* set if CSTRUCT is struct, not union */
+#define F_CDB 16
 
 struct clabel {
 	char name[NAMESIZE];

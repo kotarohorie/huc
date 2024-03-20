@@ -1,3 +1,19 @@
+/**
+ * デバッグ表示座標定義
+ */
+#ifdef DEBUG_ST
+#define ST_TX_TICK	4
+#define ST_TY_TICK	24
+#define ST_TX_PAT	0
+#define ST_TY_PAT	1
+#define ST_TX_MAP_DATA_BANKS	0
+#define ST_TY_MAP_DATA_BANKS	21
+#define ST_TX_CH_STATUS			0
+#define ST_TY_CH_STATUS			3
+#define ST_TX_ENVE_E			14
+#define ST_TY_ENVE_E			11
+#endif
+
 struct st_header {
 	unsigned char *patterns;
 	unsigned char **wave_table;
@@ -17,6 +33,7 @@ extern unsigned char st_pattern_idx;
 extern unsigned char *st_chan_map;
 extern unsigned char **st_wave_table;
 extern unsigned char **st_vol_table;
+extern unsigned char g_st_song_playing;
 
 void st_init(void);
 void st_reset(void);

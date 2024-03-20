@@ -1063,20 +1063,79 @@ _get_color.1:
 _fade_color.2:
 _fade_color.3:
 	cpx	#0
-	beq	.l4
+	bne	.level_not_0
+	jmp	.l4
+.level_not_0:
 	cpx	#8
-	bhs	.l5
+	bmi	.level_1_to_7
+	jmp	.l5
+.level_1_to_7:
 	; -- fading
+	stx	<__bl		;__bl : level
+;
+	lda	<__al
+	and	#$38
+	sta	<__di		;__di : color-R (b5..3)
+	stz	<__di+1
+;
+	lda	<__al
+	and	#$07
+	sta	<__ptr		;__ptr : color-B (b2..0)
+;color-B は b5..0 しか有効ではないので HIGH_BYTE の処理は不要
+;	stz	<__ptr+1
+;
+	lda	<__al
+	and	#$c0
+	sta	<__al		;__ax : color-G (b8..6)
+;
+	stwz	<__cx		;__cx : G
+	stwz	<__dx		;__dx : R
+	stz	<__si		;__si : B
 	ldy	#3
-	stx	<__bl
-	stwz	<__dx
-.l1:	lsr	<__bl
+.l1:
+	lsr	<__bl
 	bcc	.l2
-	addw	<__ax,<__dx
-.l2:	aslw	<__ax
+	addw	<__ax,<__cx	;G
+	addw	<__di,<__dx	;R
+	add	<__ptr,<__si	;B
+.l2:
+	aslw	<__ax
+	aslw	<__di
+	asl	<__ptr
 	dey
 	bne	.l1
+;
+.if 1
+	;19bytes
+	lda	<__ch
+	and	#$0e
+	clx
+	sax		;A=LO, X=HI
+	ora	<__dl
+	sax		;A=HI, X=LO
+	ora	<__dh
+	sax		;A=LO, X=HI
+	and	#$c0
+	ora	<__si
+	sax		;A=HI, X=LO
+;color-B は b5..0 しか有効ではないので HIGH_BYTE の処理は不要
+;	ora	<__si+1
+	stx	<__dl
+.else
+	;29bytes
+	;G(b11..9) -> b8..0 をクリア
+	__ldw	<__cx
+	and	#$0e
+	clx
+	__orw	<__dx
+	;G,R(b11..6) -> b5..0 をクリア
+	sax
+	and	#$c0
+	sax
+	__orw	<__si
+	__stw	<__dx
 	lda	<__dh
+.endif
 	lsr	A
 	ror	<__dl
 	lsr	A

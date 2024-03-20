@@ -9,7 +9,9 @@
 # general stuff
 #
 CDEFS =
-CFLAGS = -Werror -Wall -g -O2
+#CFLAGS = -Werror -Wall -g -O2
+#CFLAGS = -g -O2 -DDBPRN
+CFLAGS = -g -O2
 CFLAGS += -DGIT_VERSION="\"$(shell git describe --long --tags --dirty --always)\""
 CFLAGS += -DGIT_DATE="\"$(shell git show -s --format=%ci|cut -d" " -f1)\""
 CFLAGS += -Wno-error=unused-result

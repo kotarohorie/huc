@@ -91,6 +91,7 @@ int define_struct (char *sname, int storage, int is_struct)
 
 	// tag_table_index++;
 	if (tag_table_index >= NUMTAG) {
+		//printf("struct table overflow (name=%s,strage=%d,is_struct=%d)", sname, storage, is_struct);
 		error("struct table overflow");
 		return (0);
 	}

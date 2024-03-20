@@ -218,6 +218,7 @@ lib2_xfer_palette:
 
 .ifdef HUC
 _load_bat.4:
+_load_bat2.5:
 .endif
 load_bat:
 	maplibfunc	lib2_load_bat
@@ -860,6 +861,7 @@ ram_hdwr_tia_rts	.ds	1
 
 .ifdef HUC
 _load_vram.3:
+_load_vram2.4:
 .endif
 load_vram:
 
@@ -1709,6 +1711,22 @@ lib2____builtin_ffs.1:
 	rts
 	.bank LIB1_BANK
 
+.if 1 ;mem_mapdatabank(),mem_mapdatabanks()の不具合修正(ページ3,4の切り替えるところを P6CODE_BANK が追加された事でページ4,5を切り替えている)
+_mem_mapdatabanks:
+	tay		; y = new upper bank
+	tma #4		; a = old upper bank
+	say		; y = old upper bank, a = new upper bank
+	tam #4
+do_mapdatabank:
+	tma #3		; a = old lower bank
+	sax		; x = old lower bank, a = new lower bank
+	tam #3
+	tya		; a = old upper bank
+	rts
+_mem_mapdatabank:
+	cly
+	bra do_mapdatabank
+.else
 _mem_mapdatabanks:
 	tay		; y = new upper bank
 	tma #DATA_BANK+1; a = old upper bank
@@ -1723,6 +1741,61 @@ do_mapdatabank:
 _mem_mapdatabank:
 	cly
 	bra do_mapdatabank
+.endif
+
+.ifdef HAVE_IRQ
+;(2022/7/1) irq_del_vsync_handler 実装追加に伴い、戻り値の仕様を変更
+;- (旧)	0:登録成功 / 1:登録失敗
+;- (新) 0~3:フック番号 / -1:登録失敗
+_irq_add_vsync_handler:
+	stx	<__temp
+	clx
+.loop	ldy	user_vsync_hooks+1, x
+	beq	.found
+	inx
+	inx
+	cpx	#8
+	bne	.loop
+	; not found : return -1;
+	lda	#$ff
+	tax
+	rts
+.found	ldy	<__temp
+	sei
+	sta	user_vsync_hooks+1, x
+	tya
+	sta	user_vsync_hooks, x
+	cli
+	; found : return hook_num;
+	txa
+	lsr	A
+	tax
+	cla
+	rts
+
+;@param[in]	A:X	フック番号(0~3)
+_irq_del_vsync_handler:
+	stx	<__temp
+	sax
+	asl	A
+	sax
+	cla
+	sei
+	sta	user_vsync_hooks+1, x
+	sta	user_vsync_hooks, x
+	cli
+	rts
+
+_irq_enable_user:
+	txa
+	tsb	<huc_irq_enable
+	rts
+
+_irq_disable_user:
+	txa
+	trb	<huc_irq_enable
+	rts
+.endif ; HAVE_IRQ
 
 _timer_set:
 	stx	timer_cnt

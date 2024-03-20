@@ -100,6 +100,7 @@ joycallback:	.ds 6	; joypad enhanced callback support
 disp_cr:	.ds 1   ; display control
 			; HuCard: 1 = on, 0 = off
 			; CD-ROM: 2 = on, 1 = off, 0 = no change
+_sys_system_clock	; extern unsigned char sys_system_clock[4];
 clock_hh	.ds 1	; system clock, hours since startup (0-255)
 clock_mm	.ds 1	; system clock, minutes since startup (0-59)
 clock_ss	.ds 1	; system clock, seconds since startup (0-59)
@@ -144,6 +145,9 @@ LIB2_BANK	.rs	1
 .ifdef HAVE_LIB3
 LIB3_BANK	.rs	1
 .endif
+.ifdef HAVE_P6CODE
+P6CODE_BANK	.rs	1
+.endif
 
 .if (NEED_SOUND_BANK)
 SOUND_BANK	.rs	1
@@ -157,6 +161,29 @@ DATA_BANK	.rs	1
 ; HuC (because of .proc/.endp) does not use MAIN_BANK
 MAIN_BANK	.rs	1
 .endif	; HUC
+
+.ifdef HUC
+
+.ifdef HAVE_IRQ
+_g_user_vsync_hooks:
+user_vsync_hooks .ds	8
+_g_user_hsync_hook:
+user_hsync_hook	.ds	2
+huc_context	.ds	8
+
+.ifdef HAVE_SIRQ
+huc_fc_context	.ds	20
+.endif
+
+		.ds	32
+huc_irq_stack:
+
+		.zp
+huc_irq_enable	.ds	1
+
+.endif ; HAVE_IRQ
+
+.endif ; HUC
 
 ; [ STARTUP CODE ]
 
@@ -186,6 +213,12 @@ MAIN_BANK	.rs	1
 	.code
 	.bank	LIB3_BANK,"Base Library 3"
 	.org	$a000
+.endif
+
+.ifdef HAVE_P6CODE
+	.code
+	.bank	P6CODE_BANK,"Page6 Program"
+	.org	$c000
 .endif
 
 	.data
@@ -421,6 +454,10 @@ reset:
 	tam   #1
 	stz   $2000		; clear all the RAM
 	tii   $2000,$2001,$1FFF
+.ifdef HAVE_P6CODE
+	lda  #P6CODE_BANK
+	tam  #6
+.endif
 
 .endif	; (CDROM)
 
@@ -965,6 +1002,13 @@ irq1:
 user_irq1:
 	jmp   [irq1_jmp]
 
+.ifdef HAVE_IRQ
+user_hsync:
+	jmp   [user_hsync_hook]
+user_vsync:
+	jmp   [user_vsync_hooks, x]
+.endif
+
 
 ; ----
 ; vsync_hndl
@@ -1002,6 +1046,35 @@ vsync_hndl:
 	stw   bg_x1,video_data
 	st0   #8
 	stw   bg_y1,video_data
+
+.ifdef HAVE_IRQ
+
+	bbr3 <huc_irq_enable,.disabled
+	tii	__sp, huc_context, 8
+.ifdef HAVE_SIRQ
+        tii	__bp, huc_fc_context, 20
+.endif
+
+	stw   #huc_irq_stack, <__sp
+
+	clx
+.loop	lda   user_vsync_hooks+1, x
+	beq   .end_user
+	phx
+	jsr   user_vsync		; call user vsync routine
+	plx
+	inx
+	inx
+	bra .loop
+
+.end_user:
+	tii	huc_context, __sp, 8
+.ifdef HAVE_SIRQ
+        tii	huc_fc_context, __bp, 20
+.endif
+.disabled:
+
+.endif ; HAVE_IRQ
 
 	; --
 	lda   clock_tt		; keep track of time
@@ -1057,6 +1130,15 @@ vsync_hndl:
     ; hsync scrolling handler
     ;
 hsync_hndl:
+
+.ifdef HAVE_IRQ
+	bbr4 <huc_irq_enable,.disabled
+	tii	__sp, huc_context, 8
+	stw   #huc_irq_stack, <__sp
+	jsr  user_hsync		; call user handler
+	tii	huc_context, __sp, 8
+.disabled:
+.endif
 
 	ldy   s_idx
 	bpl  .r1

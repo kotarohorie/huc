@@ -83,4 +83,7 @@ extern int xlist;				/* listing file main flag */
 extern int list_level;				/* output level */
 extern int asm_opt[8];				/* assembler option state */
 extern int opvaltab[6][16];
-
+extern int proc_bank;			/* current .procbank bank */
+extern int max_proc_bank;		/* last .procbank bank used */
+extern int proc_bank_limit;     /* proc bank limit */
+extern int dbprn_opt;		    /* debug print enable flag */

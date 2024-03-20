@@ -11,7 +11,7 @@ include ../Make_src.inc
 
 
 HDRS = code.h data.h defs.h error.h gen.h lex.h preproc.h pseudo.h sym.h while.h
-OBJS = code.o const.o data.o error.o expr.o \
+OBJS = code.o const.o c_data_bank.o data.o error.o expr.o \
        function.o gen.o io.o lex.o main.o \
        optimize.o pragma.o preproc.o primary.o pseudo.o \
        stmt.o sym.o while.o struct.o enum.o initials.o
@@ -27,12 +27,13 @@ $(OBJS): code.h data.h defs.h error.h io.h
 
 code.o:  function.h main.h optimize.h
 const.o: const.h lex.h primary.h sym.h
+c_data_bank.o: c_data_bank.h lex.h primary.h sym.h
 expr.o:  expr.h function.h gen.h lex.h primary.h
 function.o: expr.h function.h gen.h lex.h optimize.h pragma.h pseudo.h stmt.h sym.h
 gen.o:   primary.h sym.h
 io.o:    optimize.h preproc.h
 lex.o:   lex.h preproc.h
-main.o:  const.h function.h gen.h lex.h main.h optimize.h pragma.h preproc.h \
+main.o:  const.h c_data_bank.h function.h gen.h lex.h main.h optimize.h pragma.h preproc.h \
 	 pseudo.h sym.h
 optimize.o: function.h
 pragma.o:   lex.h pragma.h sym.h
@@ -40,7 +41,7 @@ preproc.o:  lex.h optimize.h preproc.h sym.h
 primary.o:  expr.h gen.h lex.h primary.h sym.h
 pseudo.o:   lex.h optimize.h primary.h pseudo.h sym.h
 stmt.o:  expr.h gen.h lex.h preproc.h primary.h stmt.h sym.h while.h
-sym.o:   const.h gen.h lex.h primary.h pragma.h sym.h
+sym.o:   const.h c_data_bank.h gen.h lex.h primary.h pragma.h sym.h
 while.o: gen.h while.h
 
 indent:	uncrustify.cfg

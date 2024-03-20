@@ -124,6 +124,8 @@ void do_call(int *ip);
 void do_proc(int *ip);
 void do_endp(int *ip);
 void proc_reloc(void);
+void do_procbank(int *ip);
+void do_endprocbank(int *ip);
 
 /* SYMBOL.C */
 int  symhash(void);

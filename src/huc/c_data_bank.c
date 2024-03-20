@@ -1,4 +1,4 @@
-/*	File const.c: 2.1 (00/07/17,16:02:19) */
+/*	File c_data_bank.c: 2.1 (00/07/17,16:02:19) */
 /*% cc -O -c %
  *
  */
@@ -22,35 +22,35 @@
 #include "sym.h"
 
 /*
- *	setup a new const array
+ *	setup a new c_data_bank array
  *
  */
-void new_const (void)
+void new_c_data_bank (void)
 {
-	const_ptr = &const_var[const_nb];
-	const_val_idx = const_val_start;
-	const_data_idx = const_data_start;
+	c_data_bank_ptr = &c_data_bank_var[c_data_bank_nb];
+	c_data_bank_val_idx = c_data_bank_val_start;
+	c_data_bank_data_idx = c_data_bank_data_start;
 }
 
 
 /*
- *	add a const array
+ *	add a c_data_bank array
  *
  */
-void add_const (intptr_t typ)
+void add_c_data_bank (intptr_t typ)
 {
-	if ((const_data_idx >= MAX_CONST_DATA) || (const_val_idx >= MAX_CONST_VALUE))
-		error("too much constant data (> 8KB)");
-	if (const_nb >= MAX_CONST)
-		error("too much constant arrays");
+	if ((c_data_bank_data_idx >= MAX_C_DATA_BANK_DATA) || (c_data_bank_val_idx >= MAX_C_DATA_BANK_VALUE))
+		error("too much clang DATA_BANK data (> 16KB)");
+	if (c_data_bank_nb >= MAX_C_DATA_BANK)
+		error("too much clang DATA_BANK arrays");
 	else {
-		const_ptr->sym = cptr;
-		const_ptr->typ = typ;
-		const_ptr->size = const_val_idx - const_val_start;
-		const_ptr->data = const_val_start;
-		const_val_start = const_val_idx;
-		const_data_start = const_data_idx;
-		const_nb++;
+		c_data_bank_ptr->sym = cptr;
+		c_data_bank_ptr->typ = typ;
+		c_data_bank_ptr->size = c_data_bank_val_idx - c_data_bank_val_start;
+		c_data_bank_ptr->data = c_data_bank_val_start;
+		c_data_bank_val_start = c_data_bank_val_idx;
+		c_data_bank_data_start = c_data_bank_data_idx;
+		c_data_bank_nb++;
 	}
 }
 
@@ -59,7 +59,7 @@ void add_const (intptr_t typ)
  *	array initializer
  *
  */
-intptr_t array_initializer (intptr_t typ, intptr_t id, intptr_t stor)
+intptr_t array_initializer_cdb (intptr_t typ, intptr_t id, intptr_t stor)
 {
 	intptr_t nb;
 	intptr_t k;
@@ -68,14 +68,14 @@ intptr_t array_initializer (intptr_t typ, intptr_t id, intptr_t stor)
 	nb = 0;
 	k = needsub();
 
-	if (stor == CONST)
-		new_const();
+	if (stor == CDB)
+		new_c_data_bank();
 	if (match("=")) {
-		if (stor != CONST)
+		if (stor != CDB)
 			error("can't initialize non-const arrays");
 		if (!match("{")) {
 			#if defined(DBPRN)
-			error("syntax error #5");
+			error("syntax error #1");
 			#else
 			error("syntax error");
 			#endif
@@ -92,16 +92,16 @@ intptr_t array_initializer (intptr_t typ, intptr_t id, intptr_t stor)
 					continue;
 				}
 				if ((ch() == '\"') && (id == POINTER))
-					i = get_string_ptr(typ);
+					i = get_string_ptr_cdb(typ);
 				else
-					i = get_raw_value(',');
+					i = get_raw_value_cdb(',');
 				nb++;
 				blanks();
-				if (const_val_idx < MAX_CONST_VALUE)
-					const_val[const_val_idx++] = i;
+				if (c_data_bank_val_idx < MAX_C_DATA_BANK_VALUE)
+					c_data_bank_val[c_data_bank_val_idx++] = i;
 				if ((ch() != ',') && (ch() != '}')) {
 					#if defined(DBPRN)
-					error("syntax error #6");
+					error("syntax error #2");
 					#else
 					error("syntax error");
 					#endif
@@ -119,11 +119,11 @@ intptr_t array_initializer (intptr_t typ, intptr_t id, intptr_t stor)
 			error("excess elements in array initializer");
 		}
 	}
-	if (stor == CONST) {
+	if (stor == CDB) {
 		while (nb < k) {
 			nb++;
-			if (const_val_idx < MAX_CONST_VALUE)
-				const_val[const_val_idx++] = -1;
+			if (c_data_bank_val_idx < MAX_C_DATA_BANK_VALUE)
+				c_data_bank_val[c_data_bank_val_idx++] = -1;
 		}
 	}
 	return (k);
@@ -133,14 +133,14 @@ intptr_t array_initializer (intptr_t typ, intptr_t id, intptr_t stor)
  *	scalar initializer
  *
  */
-intptr_t scalar_initializer (intptr_t typ, intptr_t id, intptr_t stor)
+intptr_t scalar_initializer_cdb (intptr_t typ, intptr_t id, intptr_t stor)
 {
 	intptr_t i;
 
-	if (stor == CONST)
-		new_const();
+	if (stor == CDB)
+		new_c_data_bank();
 	if (match("=")) {
-		if (stor != CONST)
+		if (stor != CDB)
 			error("can't initialize non-const scalars");
 		blanks();
 		if (ch() == ';') {
@@ -148,15 +148,15 @@ intptr_t scalar_initializer (intptr_t typ, intptr_t id, intptr_t stor)
 			return (-1);
 		}
 		if (ch() == '\"' && id == POINTER)
-			i = get_string_ptr(typ);
+			i = get_string_ptr_cdb(typ);
 		else
-			i = get_raw_value(';');
-		if (const_val_idx < MAX_CONST_VALUE)
-			const_val[const_val_idx++] = i;
+			i = get_raw_value_cdb(';');
+		if (c_data_bank_val_idx < MAX_C_DATA_BANK_VALUE)
+			c_data_bank_val[c_data_bank_val_idx++] = i;
 		blanks();
 		if (ch() != ';') {
 			#if defined(DBPRN)
-			error("syntax error #7");
+			error("syntax error #3");
 			#else
 			error("syntax error");
 			#endif
@@ -171,7 +171,7 @@ intptr_t scalar_initializer (intptr_t typ, intptr_t id, intptr_t stor)
  *  add a string to the literal pool and return a pointer (index) to it
  *
  */
-intptr_t get_string_ptr (intptr_t typ)
+intptr_t get_string_ptr_cdb (intptr_t typ)
 {
 	intptr_t num[1];
 
@@ -188,7 +188,7 @@ intptr_t get_string_ptr (intptr_t typ)
  *  get value raw text
  *
  */
-intptr_t get_raw_value (char sep)
+intptr_t get_raw_value_cdb (char sep)
 {
 	char c;
 	char tmp[LINESIZE + 1];
@@ -201,7 +201,7 @@ intptr_t get_raw_value (char sep)
 
 	flag = 0;
 	level = 0;
-	start = const_data_idx;
+	start = c_data_bank_data_idx;
 	ptr = tmp;
 
 	for (;;) {
@@ -218,8 +218,8 @@ intptr_t get_raw_value (char sep)
 				gch();
 
 				/* add char */
-				if (const_data_idx < MAX_CONST_DATA)
-					const_data[const_data_idx++] = c;
+				if (c_data_bank_data_idx < MAX_C_DATA_BANK_DATA)
+					c_data_bank_data[c_data_bank_data_idx++] = c;
 
 				/* next */
 				c = ch();
@@ -243,7 +243,7 @@ intptr_t get_raw_value (char sep)
 			if (level)
 			{
 				#if defined(DBPRN)
-				error("syntax error #8");
+				error("syntax error #4");
 				#else
 				error("syntax error");
 				#endif
@@ -262,7 +262,7 @@ intptr_t get_raw_value (char sep)
 				flag = 0;
 				*ptr = '\0';
 				ptr = tmp;
-				had_address += add_buffer(tmp, c, is_address);
+				had_address += add_buffer_cdb(tmp, c, is_address);
 				is_address = 0;
 				if ((c == '+' || c == '-') && had_address) {
 					/* Initializers are passed almost
@@ -285,30 +285,30 @@ intptr_t get_raw_value (char sep)
 				   contains arithmetic */
 				had_address = 1;
 			}
-			else if (const_data_idx < MAX_CONST_DATA)
-				const_data[const_data_idx++] = c;
+			else if (c_data_bank_data_idx < MAX_C_DATA_BANK_DATA)
+				c_data_bank_data[c_data_bank_data_idx++] = c;
 		}
 		gch();
 	}
 	/* add buffer */
 	if (flag) {
 		*ptr = '\0';
-		add_buffer(tmp, c, is_address);
+		add_buffer_cdb(tmp, c, is_address);
 	}
 	/* close string */
-	if (const_data_idx < MAX_CONST_DATA)
-		const_data[const_data_idx++] = '\0';
+	if (c_data_bank_data_idx < MAX_C_DATA_BANK_DATA)
+		c_data_bank_data[c_data_bank_data_idx++] = '\0';
 
 	return (start);
 }
 
 
 /*
- *	add a string to the constant pool
+ *	add a string to the c_data_bank pool
  *  handle underscore
  *
  */
-int add_buffer (char *p, char c, int is_address)
+int add_buffer_cdb (char *p, char c, int is_address)
 {
 	SYMBOL *s = 0;
 
@@ -323,7 +323,7 @@ int add_buffer (char *p, char c, int is_address)
 			/* Unless preceded by an address operator, we
 			   need to get the value, and it better be
 			   constant... */
-			p = get_const(s);
+			p = get_c_data_bank(s);
 			if (!p) {
 				error("non-constant initializer");
 				return (0);
@@ -332,15 +332,15 @@ int add_buffer (char *p, char c, int is_address)
 		else if (c != '(') {
 			/* If we want the address, we need an underscore
 			   prefix. */
-			if (const_data_idx < MAX_CONST_DATA)
-				const_data[const_data_idx++] = '_';
+			if (c_data_bank_data_idx < MAX_C_DATA_BANK_DATA)
+				c_data_bank_data[c_data_bank_data_idx++] = '_';
 		}
 	}
 
 	/* string */
 	while (*p) {
-		if (const_data_idx < MAX_CONST_DATA)
-			const_data[const_data_idx++] = *p;
+		if (c_data_bank_data_idx < MAX_C_DATA_BANK_DATA)
+			c_data_bank_data[c_data_bank_data_idx++] = *p;
 		p++;
 	}
 
@@ -348,66 +348,68 @@ int add_buffer (char *p, char c, int is_address)
 	return ((s && s->ident == POINTER) || is_address);
 }
 
-char *get_const (SYMBOL *s)
+char *get_c_data_bank (SYMBOL *s)
 {
 	int i;
-	struct const_array *const_ptr;
+	struct const_array *c_data_bank_ptr;
 
-	if (const_nb) {
-		const_ptr = const_var;
+	if (c_data_bank_nb) {
+		c_data_bank_ptr = c_data_bank_var;
 
-		for (i = 0; i < const_nb; i++) {
-			if (const_ptr->sym == s) {
-				int j = const_val[const_ptr->data];
+		for (i = 0; i < c_data_bank_nb; i++) {
+			if (c_data_bank_ptr->sym == s) {
+				int j = c_data_bank_val[c_data_bank_ptr->data];
 				if (j >= 0)
-					return (&const_data[j]);
+					return (&c_data_bank_data[j]);
 				else
 					return (0);
 			}
-			const_ptr++;
+			c_data_bank_ptr++;
 		}
 	}
 	return (0);
 }
 
 /*
- *	dump the constant pool
+ *	dump the c_data_bank pool
  *
  */
-void dump_const (void)
+void dump_c_data_bank (void)
 {
 	intptr_t i, j, k;
 	intptr_t size;
 
 /*	intptr_t c; */
 
-	if (const_nb) {
-		const_ptr = const_var;
+	if (c_data_bank_nb) {
+		outstr("        .data\n");
+		c_data_bank_ptr = c_data_bank_var;
 
-		for (i = 0; i < const_nb; i++) {
-			size = const_ptr->size;
-			cptr = const_ptr->sym;
+		for (i = 0; i < c_data_bank_nb; i++) {
+			outstr("        .page   3\n");
+			size = c_data_bank_ptr->size;
+			cptr = c_data_bank_ptr->sym;
 			cptr->storage = EXTERN;
 			prefix();
 			outstr(cptr->name);
 			outstr(":");
 			nl();
-			j = const_ptr->data;
+			j = c_data_bank_ptr->data;
 
 			while (size) {
-				k = const_val[j++];
+				k = c_data_bank_val[j++];
 
 				if ((cptr->type == CCHAR || cptr->type == CUCHAR) &&
 				    cptr->ident != POINTER &&
 				    !(cptr->ident == ARRAY && cptr->ptr_order > 0)) {
 					defbyte();
-					const_size += 1;
+					c_data_bank_size += 1;
 				}
 				else {
 					defword();
-					const_size += 2;
+					c_data_bank_size += 2;
 				}
-				if ((k == -1) || (k >= MAX_CONST_DATA))
+				if ((k == -1) || (k >= MAX_C_DATA_BANK_DATA))
 					outstr("0");
 				else if (k <= -1024) {
 					k = (-k) - 1024;
@@ -416,11 +418,11 @@ void dump_const (void)
 					outdec(k);
 				}
 				else
-					outstr(&const_data[k]);
+					outstr(&c_data_bank_data[k]);
 				nl();
 				size--;
 			}
-			const_ptr++;
+			c_data_bank_ptr++;
 		}
 	}
 }

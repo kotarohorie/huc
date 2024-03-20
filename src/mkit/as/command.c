@@ -13,7 +13,14 @@ char pseudo_flag[] = {
 	0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0C,
 	0x0F, 0x0F, 0x0F, 0x0C, 0x0C, 0x0C, 0x0C, 0x0F, 0x0F, 0x0F,
 	0x0F, 0x0F, 0x0C, 0x0C, 0x0C, 0x04, 0x04, 0x04, 0x0C, 0x0C,
-	0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0F
+	0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x00, 0x04, 0x0C,
+	/**
+	 * @remarks
+	 * - [47] : .procgroup
+	 * - [48] : .endprocgroup
+	 * - [56] : .procbank : .procgroup と同じ 0x04 に設定
+	 * - [57] : .endprocbank : .endprocgroup と同じ 0x0C に設定
+	 */
 };
 
 
@@ -32,7 +39,10 @@ do_pseudo(int *ip)
 
 	/* check if the directive is allowed in the current section */
 	if (!(pseudo_flag[opval] & (1 << section)))
+	{
+		printf("opval:%d/section:%X\n", opval, section);
 		fatal_error("Directive not allowed in the current section!");
+	}
 
 	/* save current location */
 	old_bank = bank;
@@ -227,7 +237,7 @@ do_db(int *ip)
 			if (pass == LAST_PASS) {
 				/* check for overflow */
 				if ((value > 0xFF) && (value < 0xFFFFFF80)) {
-					error("Overflow error!");
+					error("(.db)Operand value overflow error!");
 					return;
 				}
 
@@ -248,7 +258,35 @@ do_db(int *ip)
 		error("Syntax error!");
 		return;
 	}
-
+#if 1
+	/**
+	 * .data セクションに.db, .dw 命令でデータを作成し、
+	 * そのデータのバンクを超えた時、 bank, location counters が更新されないため、
+	 * - 次のデータラベル開始でも bank, location counters が補正されない
+	 * - 以降のデータのバンクアドレスが 0x2000 ズレてしまう
+	 * 以上の不具合修正のため、.db, .dw 命令が .data セクションで使用された場合、
+	 * bank, location counters を更新するように変更
+	 */
+	/* update bank and location counters */
+	// bank=3(CONST_BANK)は含まないため、bankは4以上
+	if (section == S_DATA && 4 <= bank && bank < RESERVED_BANK)
+	{
+		int bak_bank = bank;
+		//printf("do_db:section:%d/bank:%02X/loccnt:%04X\n", section, bank, loccnt);
+		bank += loccnt >> 13;
+		loccnt = loccnt & 0x1FFF;
+		if (bank > max_bank) {
+			if (loccnt)
+				max_bank = bank;
+			else
+				max_bank = bank - 1;
+		}
+		if (dbprn_opt && bak_bank != bank)
+		{
+			printf("do_db:bank:%02X->%02X/max_bank:%02X\n", bak_bank, bank, max_bank);
+		}
+	}
+#endif
 	/* size */
 	if (lablptr) {
 		lablptr->data_type = P_DB;
@@ -299,7 +337,7 @@ do_dw(int *ip)
 		if (pass == LAST_PASS) {
 			/* check for overflow */
 			if ((value > 0xFFFF) && (value < 0xFFFF8000)) {
-				error("Overflow error!");
+				error("(.dw)Operand value overflow error!");
 				return;
 			}
 
@@ -319,7 +357,35 @@ do_dw(int *ip)
 		error("Syntax error!");
 		return;
 	}
-
+#if 1
+	/**
+	 * .data セクションに.db, .dw 命令でデータを作成し、
+	 * そのデータのバンクを超えた時、 bank, location counters が更新されないため、
+	 * - 次のデータラベル開始でも bank, location counters が補正されない
+	 * - 以降のデータのバンクアドレスが 0x2000 ズレてしまう
+	 * 以上の不具合修正のため、.db, .dw 命令が .data セクションで使用された場合、
+	 * bank, location counters を更新するように変更
+	 */
+	/* update bank and location counters */
+	// bank=3(CONST_BANK)は含まないため、bankは4以上
+	if (section == S_DATA && 4 <= bank && bank < RESERVED_BANK)
+	{
+		int bak_bank = bank;
+		//printf("do_dw:section:%d/bank:%02X/loccnt:%04X\n", section, bank, loccnt);
+		bank += loccnt >> 13;
+		loccnt = loccnt & 0x1FFF;
+		if (bank > max_bank) {
+			if (loccnt)
+				max_bank = bank;
+			else
+				max_bank = bank - 1;
+		}
+		if (dbprn_opt && bak_bank != bank)
+		{
+			printf("do_dw:bank:%02X->%02X/max_bank:%02X\n", bak_bank, bank, max_bank);
+		}
+	}
+#endif
 	/* size */
 	if (lablptr) {
 		lablptr->data_type = P_DB;
@@ -370,7 +436,7 @@ do_dwl(int *ip)
 		if (pass == LAST_PASS) {
 			/* check for overflow */
 			if ((value > 0xFFFF) && (value < 0xFFFF8000)) {
-				error("Overflow error!");
+				error("(.dwl)Operand value overflow error!");
 				return;
 			}
 
@@ -436,7 +502,7 @@ do_dwh(int *ip)
 		if (pass == LAST_PASS) {
 			/* check for overflow */
 			if ((value > 0xFFFF) && (value < 0xFFFF8000)) {
-				error("Overflow error!");
+				error("(.dwh)Operand value overflow error!");
 				return;
 			}
 
@@ -672,10 +738,15 @@ do_bank(int *ip)
 	bank_page[section][bank] = page;
 
 	/* get new bank infos */
+	int bak_bank = bank;
 	bank = value;
 	page = bank_page[section][bank];
 	loccnt = bank_loccnt[section][bank];
 	glablptr = bank_glabl[section][bank];
+	if (dbprn_opt && bak_bank != bank)
+	{
+		printf("do_bank:bank:%02X->%02X/section:%d/loccnt:%04X\n", bak_bank, bank, section, loccnt);
+	}
 
 	/* update the max bank counter */
 	if (max_bank < bank)
@@ -766,6 +837,7 @@ do_incbin(int *ip)
 	fclose(fp);
 
 	/* update bank and location counters */
+	int bak_bank = bank;
 	bank += (loccnt + size) >> 13;
 	loccnt = (loccnt + size) & 0x1FFF;
 	if (bank > max_bank) {
@@ -773,6 +845,10 @@ do_incbin(int *ip)
 			max_bank = bank;
 		else
 			max_bank = bank - 1;
+	}
+	if (dbprn_opt && bak_bank != bank)
+	{
+		printf("do_incbin:bank:%02X->%02X/max_bank:%02X\n", bak_bank, bank, max_bank);
 	}
 
 	/* size */
@@ -1151,7 +1227,14 @@ do_section(int *ip)
 		section = optype;
 
 		/* switch to the new section */
+		int bak_bank = bank;
 		bank = section_bank[section];
+		/* .data <-> .code などに切り替わりでの bank 更新
+		if (bak_bank != bank)
+		{
+			printf("do_section:bank:%02X->%02X\n", bak_bank, bank);
+		}
+		*/
 		page = bank_page[section][bank];
 		loccnt = bank_loccnt[section][bank];
 		glablptr = bank_glabl[section][bank];

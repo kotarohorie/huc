@@ -18,6 +18,19 @@ extern intptr_t const_data_idx;
 extern intptr_t const_size;
 extern intptr_t const_nb;
 
+/* c_data_bank arrays storage */
+
+extern struct const_array *c_data_bank_ptr;
+extern struct const_array c_data_bank_var[MAX_C_DATA_BANK];
+extern intptr_t c_data_bank_val[MAX_C_DATA_BANK_VALUE];
+extern char c_data_bank_data[MAX_C_DATA_BANK_DATA];
+extern intptr_t c_data_bank_val_start;
+extern intptr_t c_data_bank_val_idx;
+extern intptr_t c_data_bank_data_start;
+extern intptr_t c_data_bank_data_idx;
+extern intptr_t c_data_bank_size;
+extern intptr_t c_data_bank_nb;
+
 /* storage words */
 
 extern SYMBOL symtab[];
@@ -108,6 +121,7 @@ extern int user_signed_char;
 extern intptr_t output_globdef;
 extern int have_irq_handler;
 extern int have_sirq_handler;
+extern int have_p6code_handler;
 
 extern int need_map_call_bank;
 

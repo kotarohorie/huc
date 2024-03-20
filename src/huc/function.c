@@ -72,6 +72,7 @@ void newfunc (const char *sname, int ret_ptr_order, int ret_type, int ret_otag, 
 	struct fastcall *fc;
 	intptr_t hash;
 	int fc_args;
+	int is_p6code_handler = 0;
 
 	need_map_call_bank = 0;
 	is_leaf_function = 1;
@@ -253,6 +254,12 @@ void newfunc (const char *sname, int ret_ptr_order, int ret_type, int ret_otag, 
 			have_irq_handler++;
 			continue;
 		}
+		else if (amatch("__p6code", 8)) {
+			/* Goes to P6CODE_BANK for performance. */
+			is_p6code_handler = 1;
+			have_p6code_handler++;
+			continue;
+		}
 		else if (amatch("__irq", 5)) {
 			/* Goes to regular code bank, with a mapping stub in
 			   LIB1_BANK. */
@@ -380,6 +387,10 @@ void newfunc (const char *sname, int ret_ptr_order, int ret_type, int ret_otag, 
 		ol(".bank LIB1_BANK");
 		prefix(); outstr(current_fn); outstr(":"); nl();
 	}
+	else if (is_p6code_handler) {
+		ol(".bank P6CODE_BANK");
+		prefix(); outstr(current_fn); outstr(":"); nl();
+	}
 	else if (is_irq_handler) {
 		ol(".bank LIB1_BANK");
 		prefix(); outstr(current_fn); outstr(":"); nl();
@@ -409,7 +420,7 @@ void newfunc (const char *sname, int ret_ptr_order, int ret_type, int ret_otag, 
 	gtext();
 	gret();			/* generate the return statement */
 	flush_ins();		/* David, optimize.c related */
-	if (!is_firq_handler)
+	if ((!is_firq_handler) && (!is_p6code_handler))
 		ol(".endp");	/* David, .endp directive support */
 
 	/* Add space for fixed-address locals to .bss section. */

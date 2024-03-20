@@ -1,5 +1,6 @@
 #define NES_ASM_VERSION ("NES Assembler (v 3.24-" GIT_VERSION " Beta, " GIT_DATE ")")
-#define PCE_ASM_VERSION ("PC Engine Assembler (v 3.24-" GIT_VERSION ", " GIT_DATE ")")
+//#define PCE_ASM_VERSION ("PC Engine Assembler (v 3.24-" GIT_VERSION ", " GIT_DATE ")")
+#define PCE_ASM_VERSION ("PC Engine Assembler (v 3.24-KH-Custom, " GIT_DATE ")")
 #define FUJI_ASM_VERSION ("Fuji Assembler for Atari (v 3.24-" GIT_VERSION " Beta, " GIT_DATE ")")
 
 /* path separator */
@@ -20,6 +21,7 @@
 #define RESERVED_BANK	0xF0
 #define PROC_BANK	0xF1
 #define GROUP_BANK	0xF2
+#define PROCBANK_BANK	0xF3
 
 /* tile format for encoder */
 #define CHUNKY_TILE	1
@@ -108,6 +110,8 @@
 #define P_INCSPRPAL	53	// .incsprpal
 #define P_INCTILEPAL	54	// .inctilepal
 #define P_CARTRIDGE	55	// .cartridge
+#define P_PBANK		56	// .procbank
+#define P_ENDPB		57	// .endprocbank
 
 /* symbol flags */
 #define MDEF	3	/* multiply defined */
@@ -176,6 +180,12 @@ typedef struct t_proc {
 	int type;
 	int refcnt;
 	char name[SBOLSZ];
+	/**
+	 * @details
+	 * 関数が .procbank ~ .endprocbank の間にあれば >= 0。
+	 * なければ -1。
+	 */
+	int proc_bank;
 } t_proc;
 
 typedef struct t_symbol {

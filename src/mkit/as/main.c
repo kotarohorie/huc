@@ -69,6 +69,7 @@ int xlist;		/* listing file main flag */
 int list_level;		/* output level */
 int asm_opt[8];		/* assembler options */
 int zero_need;		/* counter for trailing empty sectors on CDROM */
+int dbprn_opt;		/* debug print enable flag */
 
 
 /* ----
@@ -237,6 +238,7 @@ main(int argc, char **argv)
 	cd_opt = 0;
 	mx_opt = 0;
 	file = 0;
+	dbprn_opt = 0;
 
 	/* display assembler version message */
 	printf("%s\n\n", machine->asm_title);
@@ -266,6 +268,10 @@ main(int argc, char **argv)
 				/* output s-record file */
 				else if (!strcmp(argv[i], "-srec"))
 					srec_opt = 1;
+
+				/* output s-record file */
+				else if (!strcmp(argv[i], "-dbprn"))
+					dbprn_opt = 1;
 
 				/* output level */
 				else if (!strncmp(argv[i], "-l", 2)) {
@@ -417,6 +423,13 @@ main(int argc, char **argv)
 	bank_limit = 0x7F;
 	bank_base = 0;
 	errcnt = 0;
+	max_proc_bank = -1;
+	/**
+	 * .procbank は上限を 3 に暫定設定
+	 * - 特に 3 に意味は無し
+	 * - 用途としては fnc_call しかないため 1つ (proc_bank_limit = 0)でも良さそう。
+	 */
+	proc_bank_limit = 3;
 
 	if (cd_opt) {
 		rom_limit = 0x10000;	/* 64KB */
@@ -445,6 +458,7 @@ main(int argc, char **argv)
 		skip_lines = 0;
 		rsbase = 0;
 		proc_nb = 0;
+		proc_bank = -1;
 
 		/* reset assembler options */
 		asm_opt[OPT_LIST] = 0;
@@ -495,8 +509,27 @@ main(int argc, char **argv)
 				loccnt &= 0x1fff;
 				page++;
 				bank++;
+				//printf("bank++:(%d)\n", bank);
 				if (pass == FIRST_PASS)
-					printf("   (Warning. Opcode crossing page boundary $%04X, bank $%02X)\n", (page * 0x2000), bank);
+				{
+					int page_boundary_addr = page * 0x2000;
+					if (page_boundary_addr == 0x8000)
+					{
+						/**
+						 * @remarks
+						 * (#asm~#endasm、#incasmでも同じだと思うが)
+						 * DATA_BANK に配置するデータが0x8000を超えたオペコードであった時、
+						 * DATA と CODE が同一バンクに配置しようとして、ROMデータの作成に失敗する。
+						 * FIRST_PASS で検知したら、max_bank を +1 し、 CODE を配置するバンクをズラして、これを回避する。
+						 */
+						max_bank++;
+						printf("   ((max_bank+1) = $%02X) Opcode crossing page boundary $%04X, bank $%02X\n", max_bank, page_boundary_addr, bank);
+					}
+					else
+					{
+						printf("   (Warning. Opcode crossing page boundary $%04X, bank $%02X)\n", page_boundary_addr, bank);
+					}
+				}
 			}
 			if (stop_pass)
 				break;
@@ -761,6 +794,7 @@ help(void)
 		printf("-mx        : create a Develo MX file\n");
 	}
 	printf("-srec  : create a Motorola S-record file\n");
+	printf("-dbprn : debug print enable\n");
 	printf("infile : file to be assembled\n");
 	printf("\n");
 }
@@ -870,6 +904,8 @@ show_seg_usage(void)
 	rom_free = (rom_free) >> 10;
 	printf("\t\t\t\t    ---- ----\n");
 	printf("\t\t\t\t    %4iK%4iK\n", rom_used, rom_free);
-	printf("\n\t\t\tTOTAL SIZE =     %4iK\n", (rom_used + rom_free));
+	int total_rom_size = rom_used + rom_free;
+	float used_ratio = (float)total_rom_size / (rom_limit >> 10) * 100;
+	printf("\n\t\t\tTOTAL SIZE =     %4iK(%.1f%%)\n", total_rom_size, used_ratio);
 }
 

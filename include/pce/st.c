@@ -23,6 +23,10 @@ unsigned char *st_chan_env[6];
 unsigned char st_chan_env_pos[6];
 unsigned char st_chan_len[6];
 unsigned char st_chan_disable_tune[6];
+#ifdef DEBUG_ST
+unsigned int st_chan_freq[6];
+unsigned char st_chan_chbal[6];
+#endif
 
 unsigned char st_row_idx;
 unsigned char st_pattern_idx;
@@ -33,7 +37,7 @@ unsigned char **st_wave_table;
 unsigned char **st_vol_table;
 
 static unsigned char st_tick;
-static unsigned int st_song_playing;
+unsigned char g_st_song_playing;
 
 void st_set_env(unsigned char chan, unsigned char *env)
 {
@@ -42,6 +46,9 @@ void st_set_env(unsigned char chan, unsigned char *env)
 
 void st_set_vol(unsigned char chan, unsigned char left, unsigned char right)
 {
+#ifdef DEBUG_ST
+	st_chan_chbal[chan] = (left << 4) | right;
+#endif
 	__sei();
 	*psg_ch = chan;
 	*psg_chbal = (left << 4) | right;
@@ -67,6 +74,9 @@ void st_effect_wave(unsigned char chan, unsigned int freq, unsigned char len)
 	st_chan_disable_tune[chan] = 1;
 	st_chan_env_pos[chan] = 0;
 	st_chan_len[chan] = len;
+#ifdef DEBUG_ST
+	st_chan_freq[chan] = freq;
+#endif
 	__sei();
 	*psg_ch = chan;
 	*psg_freqlo = freq & 0xff;
@@ -80,6 +90,9 @@ void st_effect_noise(unsigned char chan, unsigned char freq, unsigned char len)
 	st_chan_disable_tune[chan] = 1;
 	st_chan_env_pos[chan] = 0;
 	st_chan_len[chan] = len;
+#ifdef DEBUG_ST
+	st_chan_freq[chan] = freq;
+#endif
 	__sei();
 	*psg_ch = chan;
 	*psg_noise = 0x80 | (freq ^ 31);
@@ -88,12 +101,12 @@ void st_effect_noise(unsigned char chan, unsigned char freq, unsigned char len)
 
 void st_play_song()
 {
-	st_song_playing = 1;
+	g_st_song_playing = 1;
 }
 
 void st_stop_song()
 {
-	st_song_playing = 0;
+	g_st_song_playing = 0;
 }
 
 void st_reset(void)
@@ -115,10 +128,15 @@ void st_reset(void)
 	memset(current_wave, 0xff, sizeof(current_wave));
 	memset(st_chan_env_pos, 0, sizeof(st_chan_env_pos));
 	memset(st_chan_disable_tune, 0, sizeof(st_chan_disable_tune));
+#ifdef DEBUG_ST
+	memset(st_chan_freq, 0, sizeof(st_chan_freq));
+	memset(st_chan_chbal, 0, sizeof(st_chan_chbal));
+#endif
 	st_pattern_idx = 0;
 	st_row_idx = 0;
 	st_tick = 0;
-	st_song_playing = 0;
+	g_st_song_playing = 0;
+	irq_enable_user(IRQ_VSYNC);
 }
 
 static void load_ins(unsigned char ins)
@@ -150,6 +168,11 @@ static void vsync_handler(void) __mapcall
 	unsigned char l, m;
 	unsigned char is_drum;
 	unsigned int save_banks;
+#ifdef DEBUG_ST
+	char * str;
+	unsigned char chan_len;
+	unsigned char chbal;
+#endif
 
 #ifdef PROFILE_ST
 	timer_stop();
@@ -157,9 +180,8 @@ static void vsync_handler(void) __mapcall
 	timer_set(127);
 	timer_start();
 #endif
-
 	save_banks = mem_mapdatabanks(st_song_banks);
-	if ((st_tick & 7) == 0 && st_song_playing) {
+	if ((st_tick & 7) == 0 && g_st_song_playing) {
 		if (st_row_idx == 0) {
 			pat = st_pattern_table[st_pattern_idx];
 			if (!pat) {
@@ -169,7 +191,8 @@ static void vsync_handler(void) __mapcall
 			st_pattern_idx++;
 		}
 #ifdef DEBUG_ST
-		put_hex(pat, 4, 0, 1);
+		// PAT:
+		put_hex(pat, 4, ST_TX_PAT+4, ST_TY_PAT);
 #endif
 		for (j = 0; j < 4; j++) {
 			*psg_ch = chan = st_chan_map[j];
@@ -189,12 +212,16 @@ static void vsync_handler(void) __mapcall
 					current_wave[chan] = ins;
 				}
 #ifdef DEBUG_ST
-				put_hex(ins, 2, 10, 4 + chan);
+				// wav
+				put_hex(ins, 2, ST_TX_CH_STATUS+12, ST_TY_CH_STATUS+1 +chan);
 #endif
 				pat++;
 				st_chan_len[chan] = (*pat++) * 8;
 				freq = *pat++;
 				freq |= (*pat++) << 8;
+#ifdef DEBUG_ST
+				st_chan_freq[chan] = freq;
+#endif
 				st_chan_env_pos[chan] = 0;
 				chv = st_chan_env[chan] =
 				    st_vol_table[ins & 0x1f];
@@ -203,15 +230,22 @@ static void vsync_handler(void) __mapcall
 					*psg_noise =
 					    0x80 | ((freq & 0xf) ^ 31);
 #ifdef DEBUG_ST
-					put_string("drum", 16, 4 + chan);
+					// drum or note
+					put_string("drum", ST_TX_CH_STATUS+15, ST_TY_CH_STATUS+1 +chan);
 #endif
 					current_wave[chan] = -1;
 					st_chan_env_pos[chan] = 0;
 					chv = st_chan_env[chan] =
 					    st_vol_table[ins &
 								 0x1f];
+#ifdef DEBUG_ST
+					st_chan_chbal[chan] = 0xaa;
+#endif
 					*psg_chbal = 0xaa;
 #else
+#ifdef DEBUG_ST
+					st_chan_chbal[chan] = 0;
+#endif
 					*psg_chbal = 0;
 #endif
 				} else {
@@ -219,12 +253,13 @@ static void vsync_handler(void) __mapcall
 					*psg_freqlo = freq & 0xff;
 					*psg_freqhi = freq >> 8;
 #ifdef DEBUG_ST
-					put_string("note", 16, 4 + chan);
+					// drum or note
+					put_string("note", ST_TX_CH_STATUS+15, ST_TY_CH_STATUS+1 +chan);
+					st_chan_chbal[chan] = 0xff;
 #endif
 					*psg_chbal = 0xff;
 				}
 #ifdef DEBUG_ST
-				put_number(freq, 5, 4, 4 + chan);
 #endif
 			}
 		}
@@ -239,10 +274,10 @@ static void vsync_handler(void) __mapcall
 			st_chan_disable_tune[chan] = 0;
 			*psg_ctrl = 0x80;
 #ifdef DEBUG_ST
-			put_string("--", 23,
-				   4 + chan);
-			put_string("--", 26,
-				   4 + chan);
+			put_string("  ",  ST_TX_CH_STATUS+20, ST_TY_CH_STATUS+1 +chan);
+			put_string("--",  ST_TX_CH_STATUS+23, ST_TY_CH_STATUS+1 +chan);
+			put_string("--",  ST_TX_CH_STATUS+26, ST_TY_CH_STATUS+1 +chan);
+			put_string("---", ST_TX_CH_STATUS+29, ST_TY_CH_STATUS+1 +chan);
 #endif
 		} else {
 			st_chan_len[chan]--;
@@ -251,14 +286,29 @@ static void vsync_handler(void) __mapcall
 		if (l != 0xff) {
 			*psg_ctrl = 0x80 | chv[l];
 #ifdef DEBUG_ST
-			if (chv[l] > 31) {
-				put_string("s", 0, 12);
-				put_hex(chv, 4, 0, 13);
-				put_hex(st_tick, 2, 5, 13);
+			if (chv[l] > 31)
+			{
+				// ENVE-E: (エラー表示?)
+				put_string("s",     ST_TX_ENVE_E+ 7, ST_TY_ENVE_E);
+				put_hex(chv, 4,     ST_TX_ENVE_E+ 9, ST_TY_ENVE_E);
+				put_hex(st_tick, 2, ST_TX_ENVE_E+14, ST_TY_ENVE_E);
 			}
-			put_number(chv[l], 3, 22,
-				   4 + chan);
-			put_number(l, 2, 26, 4 + chan);
+			// freq
+			freq = st_chan_freq[chan];
+			put_number(freq,     5, ST_TX_CH_STATUS+ 2, ST_TY_CH_STATUS+1 +chan);
+			chbal = st_chan_chbal[chan];
+			put_hex(chbal >> 4,  1, ST_TX_CH_STATUS+ 8, ST_TY_CH_STATUS+1 +chan);
+			put_hex(chbal & 15,  1, ST_TX_CH_STATUS+10, ST_TY_CH_STATUS+1 +chan);
+			// SE
+			str = st_chan_disable_tune[chan] ? "SE" : "  ";
+			put_string(str, 		ST_TX_CH_STATUS+20, ST_TY_CH_STATUS+1 +chan);
+			// enve vol
+			put_number(chv[l],   2, ST_TX_CH_STATUS+23, ST_TY_CH_STATUS+1 +chan);
+			// enve pos
+			put_number(l,        2, ST_TX_CH_STATUS+26, ST_TY_CH_STATUS+1 +chan);
+			// len
+			chan_len = st_chan_len[chan];
+			put_number(chan_len, 3, ST_TX_CH_STATUS+29, ST_TY_CH_STATUS+1 +chan);
 #endif
 			if (l < 15)
 				st_chan_env_pos[chan] = l + 1;
@@ -266,7 +316,8 @@ static void vsync_handler(void) __mapcall
 	}
 	mem_mapdatabanks(save_banks);
 #ifdef DEBUG_ST
-	put_hex(st_tick, 2, 10, 0);
+	// TICK:
+	put_hex(st_tick, 2, ST_TX_TICK+5, ST_TY_TICK);
 #endif
 	++st_tick;
 #ifdef PROFILE_ST
@@ -279,6 +330,7 @@ static void vsync_handler(void) __mapcall
 void st_init(void)
 {
 	st_pattern_table = 0;
+	irq_add_vsync_handler(vsync_handler);
 }
 
 void st_set_song(unsigned char song_bank, struct st_header *song_addr)
@@ -287,14 +339,15 @@ void st_set_song(unsigned char song_bank, struct st_header *song_addr)
 	st_song_banks = ((song_bank + 1) << 8) | song_bank;
 	save = mem_mapdatabanks(st_song_banks);
 #ifdef DEBUG_ST
-	put_hex(save, 4, 0, 2);
+	// MAP DATA BANKS
+	put_hex(save, 4, ST_TX_MAP_DATA_BANKS, ST_TY_MAP_DATA_BANKS+1);
 #endif
 	st_pattern_table = song_addr->patterns;
 	st_chan_map = song_addr->chan_map;
 	st_wave_table = song_addr->wave_table;
 	st_vol_table = song_addr->vol_table;
 #ifdef DEBUG_ST
-	put_hex(mem_mapdatabanks(save), 4, 5, 2);
+	put_hex(mem_mapdatabanks(save), 4, ST_TX_MAP_DATA_BANKS+5, ST_TY_MAP_DATA_BANKS+1);
 #else
 	mem_mapdatabanks(save);
 #endif
